@@ -1171,6 +1171,7 @@ symbols! {
         large_assignments,
         last,
         lasx,
+        late_bound_turbofishing,
         lateout,
         lazy_normalization_consts,
         lazy_type_alias,
