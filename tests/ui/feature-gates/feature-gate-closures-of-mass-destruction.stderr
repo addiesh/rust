@@ -1,0 +1,8 @@
+error: evil and intimidating horse
+  --> $DIR/feature-gate-closures-of-mass-destruction.rs:2:5
+   |
+LL |     compile_error!("evil and intimidating horse");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 1 previous error
+

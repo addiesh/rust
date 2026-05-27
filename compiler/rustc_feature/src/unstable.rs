@@ -254,6 +254,8 @@ declare_features! (
     (internal, cfg_emscripten_wasm_eh, "1.86.0", None),
     /// Allows checking whether or not the backend correctly supports unstable float types.
     (internal, cfg_target_has_reliable_f16_f128, "1.88.0", None),
+    /// Updates the "outlives" checks for closure to fix a soundness bug, but introduces regressions
+    (internal, closures_of_mass_destruction, "1.79.0", None),
     /// Allows identifying the `compiler_builtins` crate.
     (internal, compiler_builtins, "1.13.0", None),
     /// Allows skipping `ConstParamTy_` trait implementation checks

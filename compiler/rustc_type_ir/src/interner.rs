@@ -284,6 +284,7 @@ pub trait Interner:
 
     type Features: Features<Self>;
     fn features(self) -> Self::Features;
+    fn compiler_features(&self) -> &rustc_feature::Features;
 
     fn assumptions_on_binders(self) -> bool;
 

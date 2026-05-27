@@ -327,6 +327,10 @@ impl<'tcx> Interner for TyCtxt<'tcx> {
         self.features()
     }
 
+    fn compiler_features(&self) -> &rustc_feature::Features {
+        self.features()
+    }
+
     fn assumptions_on_binders(self) -> bool {
         self.assumptions_on_binders()
     }

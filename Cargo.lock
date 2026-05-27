@@ -4878,6 +4878,7 @@ dependencies = [
  "rustc_ast_ir",
  "rustc_data_structures",
  "rustc_error_messages",
+ "rustc_feature",
  "rustc_index",
  "rustc_macros",
  "rustc_serialize",

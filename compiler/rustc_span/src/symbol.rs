@@ -610,6 +610,7 @@ symbols! {
         closure_lifetime_binder,
         closure_to_fn_coercion,
         closure_track_caller,
+        closures_of_mass_destruction,
         cmp,
         cmp_ord_max,
         cmp_ord_min,

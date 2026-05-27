@@ -8,7 +8,7 @@ use smallvec::{SmallVec, smallvec};
 use crate::data_structures::SsoHashSet;
 use crate::inherent::*;
 use crate::visit::{TypeSuperVisitable, TypeVisitable, TypeVisitableExt as _, TypeVisitor};
-use crate::{self as ty, AliasTy, Interner, OutlivesPredicate, Unnormalized};
+use crate::{self as ty, AliasTy, AliasTyKind, Interner, OutlivesPredicate, Unnormalized};
 
 #[derive_where(Debug; I: Interner)]
 pub enum Component<I: Interner> {
@@ -94,12 +94,16 @@ impl<I: Interner> TypeVisitor<I> for OutlivesCollector<'_, I> {
                 // any generic args present in the closure's signature are NOT assumed to outlive 'a and
                 // require adding 'a as a bound. And then like 20% of core::iterator fails to compile.
                 // There's probably some inference logic somewhere that needs to be changed.
-                // args.as_closure().sig().visit_with(self);
+                // if self.cx.compiler_features().closures_of_mass_destruction() {
+                args.as_closure().sig().visit_with(self);
+                // }
             }
 
             ty::CoroutineClosure(_, args) => {
                 args.as_coroutine_closure().tupled_upvars_ty().visit_with(self);
+                // if self.cx.compiler_features().closures_of_mass_destruction() {
                 args.as_coroutine_closure().coroutine_closure_sig().visit_with(self);
+                // }
             }
 
             ty::Coroutine(_, args) => {
@@ -145,6 +149,32 @@ impl<I: Interner> TypeVisitor<I> for OutlivesCollector<'_, I> {
             // we simply fallback to the most restrictive rule, which
             // requires that `Pi: 'a` for all `i`.
             ty::Alias(alias_ty) => {
+                if let AliasTyKind::Opaque { def_id, .. } = alias_ty.kind {
+                    let predicates = self.cx.predicates_of(def_id.into());
+                    let evil_intimidating = predicates
+                        .skip_binder()
+                        .into_iter()
+                        .filter_map(|c| c.as_trait_clause().map(|p| p.skip_binder()));
+
+                    for predicate in evil_intimidating {
+                        use crate::lang_items::SolverTraitLangItem::*;
+                        let Some(lang_item) =
+                            self.cx.as_trait_lang_item(predicate.trait_ref.def_id)
+                        else {
+                            continue;
+                        };
+
+                        match lang_item {
+                            Fn | FnMut | FnOnce => {
+                                // predicate.trait_ref.args.visit_with(self);
+                                predicate.trait_ref.args.type_at(1).visit_with(self);
+                            }
+                            AsyncFn | AsyncFnKindHelper | AsyncFnMut | AsyncFnOnce => {}
+                            _ => {}
+                        }
+                    }
+                }
+
                 if !alias_ty.has_escaping_bound_vars() {
                     // best case: no escaping regions, so push the
                     // projection and skip the subtree (thus generating no
