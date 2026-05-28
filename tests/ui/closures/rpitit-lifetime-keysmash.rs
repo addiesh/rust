@@ -1,5 +1,5 @@
+//@check-pass
 #![feature(closures_of_mass_destruction)]
-
 
 #[allow(unused)]
 fn closure_bounded<'a, T>(
