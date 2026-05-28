@@ -83,6 +83,14 @@ impl<I: Interner> TypeVisitor<I> for OutlivesCollector<'_, I> {
         // projection).
         match ty.kind() {
             ty::FnDef(_, args) => {
+                let args = args.no_bound_vars().unwrap();
+                // HACK(eddyb) ignore lifetimes found shallowly in `args`.
+                // This is inconsistent with `ty::Adt` (including all args)
+                // and with `ty::Closure` (ignoring all args other than
+                // upvars, of which a `ty::FnDef` doesn't have any), but
+                // consistent with previous (accidental) behavior.
+                // See https://github.com/rust-lang/rust/issues/70917
+                // for further background and discussion.
                 for child in args.iter() {
                     child.visit_with(self);
                 }

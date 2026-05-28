@@ -2140,10 +2140,6 @@ impl<'tcx> TyCtxt<'tcx> {
         let is_inherent_assoc_type_const =
             matches!(def_kind, DefKind::AssocConst { is_type_const: true }) && is_parent_impl;
 
-        // let is_fn = matches!(def_kind, DefKind::Fn);
-        let is_assoc_fn = matches!(def_kind, DefKind::AssocFn);
-        // &&!self.tcx().features().late_bound_turbofishing();
-
         let own_args = if !nested && (is_inherent_assoc_ty || is_inherent_assoc_type_const) {
             if generics.own_params.len() + 1 != args.len() {
                 // tracing::debug!("turbofish={is_fn_turbofish:?} @ 2107");
@@ -2183,7 +2179,7 @@ impl<'tcx> TyCtxt<'tcx> {
                 && generics.count_without_late() != args.len()
                 && generics_count != args.len()
             {
-                tracing::error!(
+                tracing::debug!(
                     "count (w/o late)={}, count={}, parent kind={def_parent:?}, args_has_self={args_has_self}, generics_has_self={generics_has_self}",
                     generics.count_without_late(),
                     generics.count(),

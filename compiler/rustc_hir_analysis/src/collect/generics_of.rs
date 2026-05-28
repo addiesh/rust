@@ -45,7 +45,6 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
         let mut own_params = opaque_ty_generics.own_params.clone();
 
         let parent_count = parent_generics.count();
-        let parent_count_without_late = parent_generics.count_without_late();
 
         let mut trait_fn_params = fn_def_generics.own_params.clone();
 
@@ -249,7 +248,7 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
         parent_has_self = generics.has_self;
         let count = generics.count();
         own_start = count as u32;
-        (count, generics.count_without_late())
+        count
     });
 
     let mut own_params = Vec::with_capacity(hir_generics.params.len() + has_self as usize);
@@ -262,24 +261,19 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
         hir_generics.params.iter().filter_map(move |param| match param.kind {
             GenericParamKind::Lifetime { .. } => {
                 let is_late_bound = tcx.is_late_bound(param.hir_id);
-                if !tcx.features().late_bound_turbofishing() && is_late_bound && false {
-                    None
-                } else {
-                    Some((param, is_late_bound))
-                }
+                //_ !tcx.features().late_bound_turbofishing()
+                if is_late_bound { None } else { Some(param) }
             }
             _ => None,
         });
 
-    own_params.extend(applicable_lifetimes.enumerate().map(|(i, (param, is_late_bound))| {
-        ty::GenericParamDef {
-            name: param.name.ident().name,
-            index: own_start + i as u32,
-            def_id: param.def_id.to_def_id(),
-            pure_wrt_drop: param.pure_wrt_drop,
-            is_late_bound,
-            kind: ty::GenericParamDefKind::Lifetime,
-        }
+    own_params.extend(applicable_lifetimes.enumerate().map(|(i, param)| ty::GenericParamDef {
+        name: param.name.ident().name,
+        index: own_start + i as u32,
+        def_id: param.def_id.to_def_id(),
+        pure_wrt_drop: param.pure_wrt_drop,
+        is_late_bound: false,
+        kind: ty::GenericParamDefKind::Lifetime,
     }));
 
     // Now create the real type and const parameters.
@@ -386,13 +380,13 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
         let lifetimes = tcx.opaque_captured_lifetimes(def_id);
         debug!(?lifetimes);
 
-        // TODO: check if filter_map with matches as a predicate would be better here?
-        own_params.extend(lifetimes.iter().map(|&(arg, param)| ty::GenericParamDef {
+        // FIXME: check if filter_map with matches as a predicate would be better here?
+        own_params.extend(lifetimes.iter().map(|&(_arg, param)| ty::GenericParamDef {
             name: tcx.item_name(param.to_def_id()),
             index: next_index(),
             def_id: param.to_def_id(),
             pure_wrt_drop: false,
-            is_late_bound: matches!(arg, ResolvedArg::LateBound(..)),
+            is_late_bound: false, // maybe do this with late turbofishing? matches!(arg, ResolvedArg::LateBound(..)),
             kind: ty::GenericParamDefKind::Lifetime,
         }));
     }
@@ -407,6 +401,7 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
         own_params,
         param_def_id_to_index,
         has_self: has_self || parent_has_self,
+        has_late_bound_regions: _has_late_bound_regions(tcx, node),
     }
 }
 
@@ -452,7 +447,7 @@ fn param_default_policy(node: Node<'_>) -> Option<ParamDefaultPolicy> {
     })
 }
 
-// TODO: use this for better reasons
+// FIXME: use this for better reasons
 fn _has_late_bound_regions<'tcx>(tcx: TyCtxt<'tcx>, node: Node<'tcx>) -> Option<Span> {
     struct LateBoundRegionsDetector<'tcx> {
         tcx: TyCtxt<'tcx>,

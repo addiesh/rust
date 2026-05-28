@@ -344,7 +344,6 @@ fn associated_type_for_impl_trait_in_impl(
 
         let parent_generics = tcx.generics_of(impl_local_def_id.to_def_id());
         let parent_count = parent_generics.count();
-        let parent_count_without_late = parent_generics.count_without_late();
 
         for param in &mut own_params {
             param.index = param.index + parent_count as u32 - trait_assoc_parent_count as u32;
