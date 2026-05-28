@@ -88,22 +88,22 @@ impl<I: Interner> TypeVisitor<I> for OutlivesCollector<'_, I> {
 
             ty::Closure(_, args) => {
                 args.as_closure().tupled_upvars_ty().visit_with(self);
-                // FIXME: this branch is still impacted by #84366. needs investigation:
+                // FIXME: this code path is still impacted by #84366. needs investigation:
                 //
                 // when returning a closure, if that closure is bound by a lifetime (eg. `impl Fn() + 'a`),
                 // any generic args present in the closure's signature are NOT assumed to outlive 'a and
                 // require adding 'a as a bound. And then like 20% of core::iterator fails to compile.
                 // There's probably some inference logic somewhere that needs to be changed.
-                // if self.cx.compiler_features().closures_of_mass_destruction() {
-                args.as_closure().sig().visit_with(self);
-                // }
+                if self.cx.compiler_features().closures_of_mass_destruction() {
+                    args.as_closure().sig().visit_with(self);
+                }
             }
 
             ty::CoroutineClosure(_, args) => {
                 args.as_coroutine_closure().tupled_upvars_ty().visit_with(self);
-                // if self.cx.compiler_features().closures_of_mass_destruction() {
-                args.as_coroutine_closure().coroutine_closure_sig().visit_with(self);
-                // }
+                if self.cx.compiler_features().closures_of_mass_destruction() {
+                    args.as_coroutine_closure().coroutine_closure_sig().visit_with(self);
+                }
             }
 
             ty::Coroutine(_, args) => {

@@ -401,21 +401,3 @@ pub mod simd {
 }
 
 include!("primitive_docs.rs");
-
-#[allow(unused)]
-fn asdhaskjdh<'a, T>(
-    count: &'a mut usize,
-) -> impl for<'b> FnMut(&'b T) + 'a /* remove the 'a bound from the returned closure and this compiles*/{
-    |x| {
-        *count += 1;
-    }
-}
-
-#[allow(unused)]
-fn asdhaskjdh2<'a, T>(
-    count: &'a mut usize,
-) -> impl for<'b> FnMut(&'b T) {
-    |x| {
-        *count += 1;
-    }
-}

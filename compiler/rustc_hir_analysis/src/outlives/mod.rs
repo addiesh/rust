@@ -2,12 +2,14 @@ use rustc_hir::def::DefKind;
 use rustc_hir::def_id::LocalDefId;
 use rustc_middle::ty::{self, CratePredicatesMap, GenericArgKind, TyCtxt, Upcast};
 use rustc_span::Span;
+use tracing::instrument;
 
 pub(crate) mod dump;
 mod explicit;
 mod implicit_infer;
 mod utils;
 
+#[instrument(level = "debug", skip(tcx))]
 pub(super) fn inferred_outlives_of(
     tcx: TyCtxt<'_>,
     item_def_id: LocalDefId,
