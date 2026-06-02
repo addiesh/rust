@@ -22,7 +22,7 @@ pub(super) fn inferred_outlives_of(
     match tcx.def_kind(item_def_id) {
         DefKind::Struct | DefKind::Enum | DefKind::Union => basic(),
         DefKind::TyAlias if tcx.type_alias_is_lazy(item_def_id) => basic(),
-        DefKind::OpaqueTy | DefKind::Fn | DefKind::Closure
+        DefKind::OpaqueTy | DefKind::Fn | DefKind::AssocFn
             if tcx.features().closures_of_mass_destruction() =>
         {
             basic()

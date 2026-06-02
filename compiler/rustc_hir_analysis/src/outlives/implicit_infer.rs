@@ -1,4 +1,5 @@
 use rustc_data_structures::fx::FxIndexMap;
+use rustc_hir::FnRetTy;
 use rustc_hir::def::DefKind;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty::{self, GenericArg, GenericArgKind, Ty, TyCtxt};
@@ -64,28 +65,47 @@ pub(super) fn infer_predicates(
                     }
                 }
 
-                DefKind::Fn => {
+                DefKind::Fn | DefKind::AssocFn => {
                     info!("implicit infer on function: {item_did:?}");
-                    // let decl = tcx.hir_fn_decl_by_hir_id(item_did.to_def_id().into()).unwrap();
-                    let fn_sig = tcx.fn_sig(item_did.to_def_id());
-                    info!("fn sig={fn_sig:?}");
-                    // let func_span = tcx.def_span(item_did.def_id);
-                    let _func_ty = fn_sig.map_bound(|b| {
-                        b.map_bound(|sig| {
-                            for arg in sig.inputs_and_output {
-                                let arg_span = tcx.ty_span(item_did);
-                                tcx.type_of(item_did.def_id).instantiate_identity().skip_norm_wip();
-                                insert_required_predicates_to_be_wf(
-                                    tcx,
-                                    arg,
-                                    arg_span,
-                                    &global_inferred_outlives,
-                                    &mut item_required_predicates,
-                                    &mut explicit_map,
-                                );
-                            }
-                        })
-                    });
+
+                    let func_ty =
+                        tcx.type_of(item_did.def_id).instantiate_identity().skip_norm_wip();
+                    let func_span = tcx.def_span(item_did.def_id);
+                    insert_required_predicates_to_be_wf(
+                        tcx,
+                        func_ty,
+                        func_span,
+                        &global_inferred_outlives,
+                        &mut item_required_predicates,
+                        &mut explicit_map,
+                    );
+
+                    let decl = tcx.hir_fn_decl_by_hir_id(item_did.into()).unwrap();
+                    for input in decl.inputs {
+                        let input_ty =
+                            tcx.type_of(item_did.def_id).instantiate_identity().skip_norm_wip();
+                        insert_required_predicates_to_be_wf(
+                            tcx,
+                            input_ty,
+                            input.span,
+                            &global_inferred_outlives,
+                            &mut item_required_predicates,
+                            &mut explicit_map,
+                        );
+                    }
+
+                    if let FnRetTy::Return(output) = decl.output {
+                        let output_ty =
+                            tcx.type_of(item_did.def_id).instantiate_identity().skip_norm_wip();
+                        insert_required_predicates_to_be_wf(
+                            tcx,
+                            output_ty,
+                            output.span,
+                            &global_inferred_outlives,
+                            &mut item_required_predicates,
+                            &mut explicit_map,
+                        );
+                    }
                 }
 
                 DefKind::OpaqueTy => {
