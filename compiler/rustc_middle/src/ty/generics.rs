@@ -121,30 +121,14 @@ pub struct GenericParamCount {
 pub struct Generics {
     pub parent: Option<DefId>,
     pub parent_count: usize,
-    // FIXME: eventually we should probably include
-    //        late-bound lifetimes in ty::Generics.
-    //        LBLTs _are still lifetimes_ and
-    //        I think it's kind of weird how hard it is
-    //        to look them up without access to HIR.
-    /// The generic params of the item/method (excluding late-bound lifetimes)
+    /// The generic params of the item/method (_including_ late-bound lifetimes)
     pub own_params: Vec<GenericParamDef>,
-
-    /// **You probably want to use `own_params` instead.**
-    ///
-    /// Contains all lifetime parameters
-    /// _(including late-bound lifetimes)_
-    /// on the item/method.
-    /// This is only used for behavior
-    /// involving late-bound lifetimes and will probably be
-    /// removed entirely in the future.
-    pub own_lifetime_params: Vec<GenericParamDef>,
 
     /// Reverse map to the `index` field of each `GenericParamDef`.
     #[stable_hash(ignore)]
     pub param_def_id_to_index: FxHashMap<DefId, u32>,
 
     pub has_self: bool,
-    pub own_late_bound_regions: Vec<Span>,
 }
 
 impl std::fmt::Debug for Generics {
@@ -159,7 +143,6 @@ impl std::fmt::Debug for Generics {
             .field("own_params", &self.own_params)
             .field("param_def_id_to_index", &stabilized_hashmap)
             .field("has_self", &self.has_self)
-            .field("own_late_bound_regions", &self.own_late_bound_regions)
             .finish()
     }
 }
