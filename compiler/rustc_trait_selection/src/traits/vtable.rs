@@ -263,7 +263,9 @@ fn vtable_entries<'tcx>(
                         ty::TypingEnv::fully_monomorphized(),
                         Unnormalized::new_wip(GenericArgs::for_item(tcx, def_id, |param, _| {
                             match param.kind {
-                                GenericParamDefKind::Lifetime => tcx.lifetimes.re_erased.into(),
+                                GenericParamDefKind::Lifetime { .. } => {
+                                    tcx.lifetimes.re_erased.into()
+                                }
                                 GenericParamDefKind::Type { .. }
                                 | GenericParamDefKind::Const { .. } => {
                                     trait_ref.args[param.index as usize]

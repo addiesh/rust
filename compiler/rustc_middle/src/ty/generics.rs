@@ -12,9 +12,15 @@ use super::{Clause, InstantiatedClauses, ParamConst, ParamTy, Ty, TyCtxt, Unnorm
 use crate::ty::region::RegionExt;
 use crate::ty::{self, ClauseKind, EarlyBinder, GenericArgsRef, Region, RegionKind, TyKind};
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, TyEncodable, TyDecodable, StableHash)]
+pub enum LifetimeParamBound {
+    Early,
+    Late,
+}
+
 #[derive(Clone, Debug, TyEncodable, TyDecodable, StableHash)]
 pub enum GenericParamDefKind {
-    Lifetime,
+    Lifetime { bound: LifetimeParamBound },
     Type { has_default: bool, synthetic: bool },
     Const { has_default: bool },
 }
@@ -22,14 +28,14 @@ pub enum GenericParamDefKind {
 impl GenericParamDefKind {
     pub fn descr(&self) -> &'static str {
         match self {
-            GenericParamDefKind::Lifetime => "lifetime",
+            GenericParamDefKind::Lifetime { .. } => "lifetime",
             GenericParamDefKind::Type { .. } => "type",
             GenericParamDefKind::Const { .. } => "constant",
         }
     }
     pub fn to_ord(&self) -> ast::ParamKindOrd {
         match self {
-            GenericParamDefKind::Lifetime => ast::ParamKindOrd::Lifetime,
+            GenericParamDefKind::Lifetime { .. } => ast::ParamKindOrd::Lifetime,
             GenericParamDefKind::Type { .. } | GenericParamDefKind::Const { .. } => {
                 ast::ParamKindOrd::TypeOrConst
             }
@@ -38,7 +44,7 @@ impl GenericParamDefKind {
 
     pub fn is_ty_or_const(&self) -> bool {
         match self {
-            GenericParamDefKind::Lifetime => false,
+            GenericParamDefKind::Lifetime { .. } => false,
             GenericParamDefKind::Type { .. } | GenericParamDefKind::Const { .. } => true,
         }
     }
@@ -67,18 +73,22 @@ pub struct GenericParamDef {
 
 impl GenericParamDef {
     pub fn to_early_bound_region_data(&self) -> ty::EarlyParamRegion {
-        if let GenericParamDefKind::Lifetime = self.kind {
+        if let GenericParamDefKind::Lifetime { bound } = self.kind {
+            if bound == LifetimeParamBound::Late {
+                bug!("cannot convert a late-bound parameter def to an early-bound region")
+            }
             ty::EarlyParamRegion { index: self.index, name: self.name }
         } else {
-            bug!("cannot convert a non-lifetime parameter def to an early bound region")
+            bug!("cannot convert a non-lifetime parameter def to an early-bound region")
         }
     }
 
+    pub fn is_lifetime(&self) -> bool {
+        matches!(self.kind, GenericParamDefKind::Lifetime { .. })
+    }
+
     pub fn is_anonymous_lifetime(&self) -> bool {
-        match self.kind {
-            GenericParamDefKind::Lifetime => self.name == kw::UnderscoreLifetime,
-            _ => false,
-        }
+        self.is_lifetime() && self.name == kw::UnderscoreLifetime
     }
 
     pub fn default_value<'tcx>(
@@ -98,7 +108,7 @@ impl GenericParamDef {
 
     pub fn to_error<'tcx>(&self, tcx: TyCtxt<'tcx>) -> ty::GenericArg<'tcx> {
         match &self.kind {
-            ty::GenericParamDefKind::Lifetime => ty::Region::new_error_misc(tcx).into(),
+            ty::GenericParamDefKind::Lifetime { .. } => ty::Region::new_error_misc(tcx).into(),
             ty::GenericParamDefKind::Type { .. } => Ty::new_misc_error(tcx).into(),
             ty::GenericParamDefKind::Const { .. } => ty::Const::new_misc_error(tcx).into(),
         }
@@ -182,7 +192,7 @@ impl<'tcx> Generics {
 
         for param in &self.own_params {
             match param.kind {
-                GenericParamDefKind::Lifetime => own_counts.lifetimes += 1,
+                GenericParamDefKind::Lifetime { .. } => own_counts.lifetimes += 1,
                 GenericParamDefKind::Type { .. } => own_counts.types += 1,
                 GenericParamDefKind::Const { .. } => own_counts.consts += 1,
             }
@@ -196,7 +206,7 @@ impl<'tcx> Generics {
 
         for param in &self.own_params {
             match param.kind {
-                GenericParamDefKind::Lifetime => (),
+                GenericParamDefKind::Lifetime { .. } => (),
                 GenericParamDefKind::Type { has_default, .. } => {
                     own_defaults.types += has_default as usize;
                 }
@@ -228,7 +238,7 @@ impl<'tcx> Generics {
                 GenericParamDefKind::Type { .. } | GenericParamDefKind::Const { .. } => {
                     return true;
                 }
-                GenericParamDefKind::Lifetime => {}
+                GenericParamDefKind::Lifetime { .. } => {}
             }
         }
         false
@@ -261,7 +271,10 @@ impl<'tcx> Generics {
     ) -> &'tcx GenericParamDef {
         let param = self.param_at(param.index as usize, tcx);
         match param.kind {
-            GenericParamDefKind::Lifetime => param,
+            GenericParamDefKind::Lifetime { bound } => {
+                debug_assert_eq!(bound, LifetimeParamBound::Early);
+                param
+            }
             _ => {
                 bug!("expected lifetime parameter, but found another generic parameter: {param:#?}")
             }

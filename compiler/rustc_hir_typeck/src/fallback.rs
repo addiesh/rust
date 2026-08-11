@@ -488,7 +488,8 @@ impl<'tcx> AnnotateUnitFallbackVisitor<'_, 'tcx> {
             && let generics = self.fcx.tcx.generics_of(def_id)
             && let args = all_args[generics.parent_count..].iter().zip(&generics.own_params)
             // We can't turbofish consts :(
-            && args.clone().all(|(_, param)| matches!(param.kind, ty::GenericParamDefKind::Type { .. } | ty::GenericParamDefKind::Lifetime))
+            // ...but we're working on being able to turbofish late-bound lifetimes- should those be filtered out here?
+            && args.clone().all(|(_, param)| matches!(param.kind, ty::GenericParamDefKind::Type { .. } | ty::GenericParamDefKind::Lifetime { .. }))
         {
             // We filter out APITs, which are not turbofished.
             let non_apit_type_args = args.filter(|(_, param)| {

@@ -93,7 +93,7 @@ pub(crate) fn suggest_to_remove_or_use_generic(
         .iter()
         .filter(|p| {
             if is_lifetime {
-                matches!(p.kind, GenericParamDefKind::Lifetime)
+                matches!(p.kind, GenericParamDefKind::Lifetime { .. })
             } else {
                 matches!(p.kind, GenericParamDefKind::Type { .. })
             }

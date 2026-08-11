@@ -1531,12 +1531,17 @@ pub struct Generics {
     pub params: Vec<GenericParamDef>,
     pub param_def_id_to_index: Vec<(GenericDef, u32)>,
     pub has_self: bool,
-    pub has_late_bound_regions: Option<Span>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub enum LifetimeParamBound {
+    Early,
+    Late,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum GenericParamDefKind {
-    Lifetime,
+    Lifetime { bound: LifetimeParamBound },
     Type { has_default: bool, synthetic: bool },
     Const { has_default: bool },
 }

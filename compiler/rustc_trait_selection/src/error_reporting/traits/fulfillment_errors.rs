@@ -2824,7 +2824,10 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
             }
             trait_generics.own_params.iter().zip(other_trait_generics.own_params.iter()).all(
                 |(a, b)| match (&a.kind, &b.kind) {
-                    (ty::GenericParamDefKind::Lifetime, ty::GenericParamDefKind::Lifetime)
+                    (
+                        ty::GenericParamDefKind::Lifetime { .. },
+                        ty::GenericParamDefKind::Lifetime { .. },
+                    )
                     | (
                         ty::GenericParamDefKind::Type { .. },
                         ty::GenericParamDefKind::Type { .. },

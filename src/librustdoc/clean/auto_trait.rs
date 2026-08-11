@@ -343,7 +343,7 @@ fn clean_region_outlives_constraints<'tcx>(
         .own_params
         .iter()
         .filter_map(|param| match param.kind {
-            ty::GenericParamDefKind::Lifetime => Some(param.name),
+            ty::GenericParamDefKind::Lifetime { .. } => Some(param.name),
             _ => None,
         })
         .collect();

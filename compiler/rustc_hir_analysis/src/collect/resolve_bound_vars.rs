@@ -307,7 +307,8 @@ fn generic_param_def_as_bound_arg<'tcx>(
     param: &ty::GenericParamDef,
 ) -> ty::BoundVariableKind<'tcx> {
     match param.kind {
-        ty::GenericParamDefKind::Lifetime => {
+        ty::GenericParamDefKind::Lifetime { .. } => {
+            // TODO(addiesh): this is probably wrong
             ty::BoundVariableKind::Region(ty::BoundRegionKind::Named(param.def_id))
         }
         ty::GenericParamDefKind::Type { .. } => {
@@ -564,8 +565,15 @@ impl<'a, 'tcx> Visitor<'tcx> for BoundVarContext<'a, 'tcx> {
                         while let Some(parent_item) = opt_parent_item {
                             let parent_generics = self.tcx.generics_of(parent_item);
                             for param in parent_generics.own_params.iter().rev() {
-                                if let ty::GenericParamDefKind::Lifetime = param.kind {
-                                    let def = ResolvedArg::EarlyBound(param.def_id.expect_local());
+                                if let ty::GenericParamDefKind::Lifetime { bound } = param.kind {
+                                    let def = match bound {
+                                        ty::LifetimeParamBound::Early => {
+                                            ResolvedArg::EarlyBound(param.def_id.expect_local())
+                                        }
+                                        ty::LifetimeParamBound::Late => {
+                                            todo!()
+                                        }
+                                    };
                                     let ident = lifetime_ident(param.def_id.expect_local());
                                     self.remap_opaque_captures(&opaque_capture_scopes, def, ident);
                                 }

@@ -453,7 +453,8 @@ impl<'a, 'tcx> ConfirmContext<'a, 'tcx> {
                 arg: &GenericArg<'tcx>,
             ) -> ty::GenericArg<'tcx> {
                 match (&param.kind, arg) {
-                    (GenericParamDefKind::Lifetime, GenericArg::Lifetime(lt)) => self
+                    // TODO(addiesh): check this
+                    (GenericParamDefKind::Lifetime { .. }, GenericArg::Lifetime(lt)) => self
                         .cfcx
                         .fcx
                         .lowerer()

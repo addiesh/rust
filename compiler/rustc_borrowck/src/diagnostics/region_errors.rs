@@ -1156,7 +1156,7 @@ impl<'diag, 'tcx> MirBorrowckCtxt<'_, 'diag, 'tcx> {
         // Get the arguments for the found method, only specifying that `Self` is the receiver type.
         let Some(possible_rcvr_ty) = typeck_results.node_type_opt(rcvr.hir_id) else { return };
         let args = GenericArgs::for_item(tcx, method_def_id, |param, _| {
-            if let ty::GenericParamDefKind::Lifetime = param.kind {
+            if let ty::GenericParamDefKind::Lifetime { .. } = param.kind {
                 tcx.lifetimes.re_erased.into()
             } else if param.index == 0 && param.name == kw::SelfUpper {
                 possible_rcvr_ty.into()

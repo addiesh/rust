@@ -814,7 +814,7 @@ impl<'tcx> InferSourceKind<'tcx> {
                                 param: param_name.clone(),
                             })
                         }
-                        GenericParamDefKind::Lifetime => {
+                        GenericParamDefKind::Lifetime { .. } => {
                             bug!("unexpected lifetime")
                         }
                     }

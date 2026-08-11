@@ -8,7 +8,8 @@ use rustc_public_bridge::context::CompilerCtxt;
 use crate::alloc;
 use crate::compiler_interface::BridgeTys;
 use crate::ty::{
-    AdtKind, FloatTy, GenericArgs, GenericParamDef, IntTy, Region, RigidTy, TyKind, UintTy,
+    AdtKind, FloatTy, GenericArgs, GenericParamDef, IntTy, LifetimeParamBound, Region, RigidTy,
+    TyKind, UintTy,
 };
 use crate::unstable::Stable;
 
@@ -681,12 +682,6 @@ impl<'tcx> Stable<'tcx> for ty::Generics {
             params,
             param_def_id_to_index,
             has_self: self.has_self,
-            // FIXME: this type def has not been updated in rustc public
-            has_late_bound_regions: self
-                .own_late_bound_regions
-                .first()
-                .as_ref()
-                .map(|late_bound_regions| late_bound_regions.stable(tables, cx)),
         }
     }
 }
@@ -697,7 +692,12 @@ impl<'tcx> Stable<'tcx> for rustc_middle::ty::GenericParamDefKind {
     fn stable(&self, _: &mut Tables<'_, BridgeTys>, _: &CompilerCtxt<'_, BridgeTys>) -> Self::T {
         use crate::ty::GenericParamDefKind;
         match *self {
-            ty::GenericParamDefKind::Lifetime => GenericParamDefKind::Lifetime,
+            ty::GenericParamDefKind::Lifetime { bound } => GenericParamDefKind::Lifetime {
+                bound: match bound {
+                    ty::LifetimeParamBound::Early => LifetimeParamBound::Early,
+                    ty::LifetimeParamBound::Late => LifetimeParamBound::Late,
+                },
+            },
             ty::GenericParamDefKind::Type { has_default, synthetic } => {
                 GenericParamDefKind::Type { has_default, synthetic }
             }

@@ -1080,11 +1080,11 @@ fn assert_generic_args_match<'tcx>(tcx: TyCtxt<'tcx>, did: DefId, args: &[Generi
             .zip(args.iter().map(|&x| x.kind()))
             .enumerate()
             .find(|(_, (param, arg))| match (param, arg) {
-                (ty::GenericParamDefKind::Lifetime, GenericArgKind::Lifetime(_))
+                (ty::GenericParamDefKind::Lifetime { .. }, GenericArgKind::Lifetime(_))
                 | (ty::GenericParamDefKind::Type { .. }, GenericArgKind::Type(_))
                 | (ty::GenericParamDefKind::Const { .. }, GenericArgKind::Const(_)) => false,
                 (
-                    ty::GenericParamDefKind::Lifetime
+                    ty::GenericParamDefKind::Lifetime { .. }
                     | ty::GenericParamDefKind::Type { .. }
                     | ty::GenericParamDefKind::Const { .. },
                     _,

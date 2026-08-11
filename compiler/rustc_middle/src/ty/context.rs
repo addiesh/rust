@@ -2161,7 +2161,8 @@ impl<'tcx> TyCtxt<'tcx> {
         for (param, arg) in std::iter::zip(&generics.own_params, own_args) {
             match (&param.kind, arg.kind()) {
                 (ty::GenericParamDefKind::Type { .. }, ty::GenericArgKind::Type(_))
-                | (ty::GenericParamDefKind::Lifetime, ty::GenericArgKind::Lifetime(_))
+                // NOTE: this ignores late/early differences.
+                | (ty::GenericParamDefKind::Lifetime { ..}, ty::GenericArgKind::Lifetime(_))
                 | (ty::GenericParamDefKind::Const { .. }, ty::GenericArgKind::Const(_)) => {}
                 _ => return false,
             }
@@ -2233,9 +2234,12 @@ impl<'tcx> TyCtxt<'tcx> {
 
     pub fn mk_param_from_def(self, param: &ty::GenericParamDef) -> GenericArg<'tcx> {
         match param.kind {
-            GenericParamDefKind::Lifetime => {
-                ty::Region::new_early_param(self, param.to_early_bound_region_data()).into()
-            }
+            GenericParamDefKind::Lifetime { bound } => match bound {
+                ty::LifetimeParamBound::Early => {
+                    ty::Region::new_early_param(self, param.to_early_bound_region_data()).into()
+                }
+                ty::LifetimeParamBound::Late => todo!("mk_param_from_def for late-bound region"),
+            },
             GenericParamDefKind::Type { .. } => Ty::new_param(self, param.index, param.name).into(),
             GenericParamDefKind::Const { .. } => {
                 ty::Const::new_param(self, ParamConst { index: param.index, name: param.name })

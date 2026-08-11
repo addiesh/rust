@@ -354,7 +354,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     ) -> Option<InferOk<'tcx, MethodCallee<'tcx>>> {
         // Construct a trait-reference `self_ty : Trait<input_tys>`
         let args = GenericArgs::for_item(self.tcx, trait_def_id, |param, _| match param.kind {
-            GenericParamDefKind::Lifetime | GenericParamDefKind::Const { .. } => {
+            GenericParamDefKind::Lifetime { .. } | GenericParamDefKind::Const { .. } => {
                 unreachable!("did not expect operator trait to have lifetime/const")
             }
             GenericParamDefKind::Type { .. } => {

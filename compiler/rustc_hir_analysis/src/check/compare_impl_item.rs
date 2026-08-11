@@ -1925,12 +1925,12 @@ fn compare_synthetic_generics<'tcx>(
     let impl_m_type_params =
         impl_m_generics.own_params.iter().filter_map(|param| match param.kind {
             GenericParamDefKind::Type { synthetic, .. } => Some((param.def_id, synthetic)),
-            GenericParamDefKind::Lifetime | GenericParamDefKind::Const { .. } => None,
+            GenericParamDefKind::Lifetime { .. } | GenericParamDefKind::Const { .. } => None,
         });
     let trait_m_type_params =
         trait_m_generics.own_params.iter().filter_map(|param| match param.kind {
             GenericParamDefKind::Type { synthetic, .. } => Some((param.def_id, synthetic)),
-            GenericParamDefKind::Lifetime | GenericParamDefKind::Const { .. } => None,
+            GenericParamDefKind::Lifetime { .. } | GenericParamDefKind::Const { .. } => None,
         });
     for ((impl_def_id, impl_synthetic), (trait_def_id, trait_synthetic)) in
         iter::zip(impl_m_type_params, trait_m_type_params)
@@ -2674,7 +2674,7 @@ fn param_env_with_gat_bounds<'tcx>(
                     )
                     .into()
                 }
-                GenericParamDefKind::Lifetime => {
+                GenericParamDefKind::Lifetime { .. } => {
                     let kind = ty::BoundRegionKind::Named(param.def_id);
                     let bound_var = ty::BoundVariableKind::Region(kind);
                     bound_vars.push(bound_var);

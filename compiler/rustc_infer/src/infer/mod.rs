@@ -1028,7 +1028,7 @@ impl<'tcx> InferCtxt<'tcx> {
 
     pub fn var_for_def(&self, span: Span, param: &ty::GenericParamDef) -> GenericArg<'tcx> {
         match param.kind {
-            GenericParamDefKind::Lifetime => {
+            GenericParamDefKind::Lifetime { .. } => {
                 // Create a region inference variable for the given
                 // region parameter definition.
                 self.next_region_var(RegionVariableOrigin::RegionParameterDefinition(

@@ -113,7 +113,7 @@ impl<'tcx> TypeErrCtxt<'_, 'tcx> {
                     GenericParamDefKind::Type { .. } | GenericParamDefKind::Const { .. } => {
                         args[*index as usize].to_string()
                     }
-                    GenericParamDefKind::Lifetime => continue,
+                    GenericParamDefKind::Lifetime { .. } => continue,
                 };
                 generic_args.push((*name, value));
 
@@ -256,7 +256,7 @@ impl<'tcx> TypeErrCtxt<'_, 'tcx> {
                             trait_pred.trait_ref.args[param.index as usize].to_string()
                         }
                     }
-                    GenericParamDefKind::Lifetime => return None,
+                    GenericParamDefKind::Lifetime { .. } => return None,
                 };
                 let name = param.name;
                 Some((name, value))

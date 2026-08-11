@@ -666,7 +666,7 @@ fn check_opaque_precise_captures<'tcx>(tcx: TyCtxt<'tcx>, opaque_def_id: LocalDe
             }
 
             match param.kind {
-                ty::GenericParamDefKind::Lifetime => {
+                ty::GenericParamDefKind::Lifetime { .. } => {
                     let use_span = tcx.def_span(param.def_id);
                     let opaque_span = tcx.def_span(opaque_def_id);
                     // Check if the lifetime param was captured but isn't named in the precise captures list.

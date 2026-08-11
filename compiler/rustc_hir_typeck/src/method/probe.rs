@@ -2616,7 +2616,7 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
                     args[i]
                 } else {
                     match param.kind {
-                        GenericParamDefKind::Lifetime => {
+                        GenericParamDefKind::Lifetime { .. } => {
                             // In general, during probe we erase regions.
                             self.tcx.lifetimes.re_erased.into()
                         }

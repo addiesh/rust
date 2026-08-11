@@ -1319,7 +1319,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 arg: &GenericArg<'tcx>,
             ) -> ty::GenericArg<'tcx> {
                 match (&param.kind, arg) {
-                    (GenericParamDefKind::Lifetime, GenericArg::Lifetime(lt)) => self
+                    // TODO(addiesh): check this
+                    (GenericParamDefKind::Lifetime { .. }, GenericArg::Lifetime(lt)) => self
                         .fcx
                         .lowerer()
                         .lower_lifetime(lt, RegionInferReason::Param(param))

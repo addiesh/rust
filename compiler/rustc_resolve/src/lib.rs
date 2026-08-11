@@ -1718,7 +1718,7 @@ impl<'tcx> Resolver<'_, 'tcx> {
                 .own_params
                 .iter()
                 .filter_map(|param| match param.kind {
-                    ty::GenericParamDefKind::Lifetime => Some("'_"),
+                    ty::GenericParamDefKind::Lifetime { .. } => Some("'_"),
                     ty::GenericParamDefKind::Type { has_default, .. }
                     | ty::GenericParamDefKind::Const { has_default } => {
                         if has_default {

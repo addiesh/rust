@@ -754,7 +754,8 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
         let mut num_bound_vars = candidate.bound_vars().len();
         let args = candidate.skip_binder().args.extend_to(tcx, item_def_id, |param, _| {
             let arg = match param.kind {
-                ty::GenericParamDefKind::Lifetime => ty::Region::new_bound(
+                ty::GenericParamDefKind::Lifetime { bound: _ } => ty::Region::new_bound(
+                    // TODO(addiesh): fix this
                     tcx,
                     ty::INNERMOST,
                     ty::BoundRegion {

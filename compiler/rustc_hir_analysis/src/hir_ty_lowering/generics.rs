@@ -252,7 +252,7 @@ pub fn lower_generic_args<'tcx: 'a, 'a>(
             match (args_iter.peek(), params.peek()) {
                 (Some(&arg), Some(&param)) => {
                     match (arg, &param.kind, arg_count.explicit_late_bound) {
-                        (GenericArg::Lifetime(_), GenericParamDefKind::Lifetime, _)
+                        (GenericArg::Lifetime(_), GenericParamDefKind::Lifetime { .. }, _)
                         | (
                             GenericArg::Type(_) | GenericArg::Infer(_),
                             GenericParamDefKind::Type { .. },
@@ -271,7 +271,7 @@ pub fn lower_generic_args<'tcx: 'a, 'a>(
                         }
                         (
                             GenericArg::Infer(_) | GenericArg::Type(_) | GenericArg::Const(_),
-                            GenericParamDefKind::Lifetime,
+                            GenericParamDefKind::Lifetime { .. },
                             _,
                         ) => {
                             // We expected a lifetime argument, but got a type or const
@@ -442,23 +442,39 @@ pub(crate) fn check_generic_arg_count(
     //
     // see: <tests/ui/lifetimes/turbofishing-invisible-lifetimes-154490.rs>
 
-    let hidden_early_lifetimes =
-        gen_params.own_params.iter().filter(|x| x.is_anonymous_lifetime()).count();
-
-    let hidden_late_lifetimes =
-        gen_params.own_lifetime_params.iter().filter(|x| x.is_anonymous_lifetime()).count()
-            - hidden_early_lifetimes;
+    let (hidden_early_lifetimes, hidden_late_lifetimes) = gen_params
+        .own_params
+        .iter()
+        .filter_map(|param| match param.kind {
+            GenericParamDefKind::Lifetime { bound } if param.name == kw::UnderscoreLifetime => {
+                Some(bound)
+            }
+            _ => None,
+        })
+        .fold((0usize, 0usize), |(early, late), param| match param {
+            ty::LifetimeParamBound::Early => (early + 1, late),
+            ty::LifetimeParamBound::Late => (early, late + 1),
+        });
 
     debug!(?hidden_early_lifetimes, ?hidden_late_lifetimes);
 
-    let late_bound_lt_count = gen_params.own_late_bound_regions.len();
+    let late_bound_lt_count = gen_params
+        .own_params
+        .iter()
+        .filter(|param| {
+            matches!(
+                param.kind,
+                GenericParamDefKind::Lifetime { bound: ty::LifetimeParamBound::Late }
+            )
+        })
+        .count();
 
     if kind.is_fn_like() {
         debug!("we are using fn-like {:?} ({gen_pos:?})", tcx.item_name(def_id));
     }
     debug!(?late_bound_lt_count);
     debug!("gen_args count = {}", gen_args.args.len());
-    debug!("lb+eb lifetimes={:?}", gen_params.own_lifetime_params);
+    debug!("params = {:?}", gen_params.own_params);
 
     // Suppress this warning for delegations as it is compiler generated and lifetimes are
     // propagated while late-bound lifetimes may be present.
@@ -686,30 +702,45 @@ pub(crate) fn prohibit_explicit_late_bound_lifetimes(
 
     let param_counts = def.own_counts();
 
+    let late_bound_lifetimes = def
+        .own_params
+        .iter()
+        .filter_map(|param| match param.kind {
+            GenericParamDefKind::Lifetime { bound: ty::LifetimeParamBound::Late } => {
+                Some(cx.tcx().def_span(param.def_id))
+            }
+            _ => None,
+        })
+        .collect::<Box<_>>();
+
     // FIXME(addiesh): just turning off the diagnostic is probably not enough to solve the problem. see:
     //        https://rust-lang.zulipchat.com/#narrow/channel/600108-t-types.2Fearly-late-cleanup/topic/turbofishing.20elided.20lifetimes/near/607748866
     if cx.tcx().features().late_bound_turbofishing() {
         ExplicitLateBound::Yes
-    } else if let Some(span_late) = def.own_late_bound_regions.first().copied()
-        && args.has_lifetime_args()
-    {
+    } else if !late_bound_lifetimes.is_empty() && args.has_lifetime_args() {
         let gone_turbofishing = "this may change in the future; see issue #156581 <https://github.com/rust-lang/rust/issues/156581> for more information";
 
         let msg = "cannot specify lifetime arguments explicitly \
                        if late bound lifetime parameters are present";
-        let note = "the late bound lifetime parameter is introduced here";
+        let note = "late bound lifetime parameter introduced here";
         let span = args.args[0].span();
 
         if position == GenericArgPosition::Value(IsMethodCall::No)
             && args.num_lifetime_args() != param_counts.lifetimes
         {
-            struct_span_code_err!(cx.dcx(), span, E0794, "{}", msg)
-                .with_span_note(span_late, note)
-                .with_note(gone_turbofishing)
-                .emit();
+            let mut diag = struct_span_code_err!(cx.dcx(), span, E0794, "{}", msg);
+
+            for span_late in late_bound_lifetimes {
+                diag = diag.with_span_note(span_late, note);
+            }
+
+            diag.with_note(gone_turbofishing).emit();
         } else {
             let mut multispan = MultiSpan::from_span(span);
-            multispan.push_span_label(span_late, note);
+            for span_late in late_bound_lifetimes {
+                multispan.push_span_label(span_late, note);
+            }
+
             cx.tcx().emit_node_span_lint(
                 LATE_BOUND_LIFETIME_ARGUMENTS,
                 args.args[0].hir_id(),

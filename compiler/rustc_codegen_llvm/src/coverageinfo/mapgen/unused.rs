@@ -160,7 +160,7 @@ fn make_dummy_instance<'tcx>(tcx: TyCtxt<'tcx>, local_def_id: LocalDefId) -> ty:
     ty::Instance::new_raw(
         def_id,
         ty::GenericArgs::for_item(tcx, def_id, |param, _| {
-            if let ty::GenericParamDefKind::Lifetime = param.kind {
+            if let ty::GenericParamDefKind::Lifetime { .. } = param.kind {
                 tcx.lifetimes.re_erased.into()
             } else {
                 tcx.mk_param_from_def(param)

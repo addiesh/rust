@@ -962,7 +962,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
             let mut used_names =
                 iter::successors(Some(generics), |g| g.parent.map(|p| self.tcx.generics_of(p)))
                     .flat_map(|g| &g.own_params)
-                    .filter(|p| matches!(p.kind, ty::GenericParamDefKind::Lifetime))
+                    .filter(|p| matches!(p.kind, ty::GenericParamDefKind::Lifetime { .. }))
                     .map(|p| p.name)
                     .collect::<Vec<_>>();
             let hir_id = self.tcx.local_def_id_to_hir_id(lifetime_scope);
@@ -1423,7 +1423,7 @@ fn suggest_precise_capturing<'tcx>(
                 }
 
                 match param.kind {
-                    ty::GenericParamDefKind::Lifetime => {
+                    ty::GenericParamDefKind::Lifetime { .. } => {
                         captured_lifetimes.insert(param.name);
                     }
                     ty::GenericParamDefKind::Type { synthetic: true, .. } => {

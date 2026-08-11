@@ -729,7 +729,7 @@ fn trait_impl_lifetime_params_count(tcx: TyCtxt<'_>, did: LocalDefId) -> usize {
     tcx.generics_of(did)
         .own_params
         .iter()
-        .filter(|p| matches!(p.kind, ty::GenericParamDefKind::Lifetime))
+        .filter(|p| matches!(p.kind, ty::GenericParamDefKind::Lifetime { .. }))
         .count()
 }
 

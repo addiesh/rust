@@ -5,14 +5,12 @@ use rustc_errors::{Diag, DiagCtxtHandle, Diagnostic, Level};
 use rustc_hir::def::DefKind;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::{self, Visitor, VisitorExt};
-use rustc_hir::{self as hir, AmbigArg, GenericParamKind, HirId, Node};
+use rustc_hir::{self as hir, GenericParamKind, HirId, Node};
 use rustc_middle::span_bug;
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_session::lint;
-use rustc_span::{Span, kw, sym};
+use rustc_span::{kw, sym};
 use tracing::{debug, instrument};
-
-use crate::middle::resolve_bound_vars as rbv;
 
 #[instrument(level = "debug", skip(tcx), ret)]
 pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
@@ -267,30 +265,30 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
         own_params.push(opt_self);
     }
 
-    let own_lifetime_params = hir_generics
-        .params
-        .iter()
-        .enumerate()
-        .filter_map(|(i, param)| match param.kind {
-            GenericParamKind::Lifetime { .. } => Some(ty::GenericParamDef {
-                name: param.name.ident().name,
-                index: own_start + i as u32,
-                def_id: param.def_id.to_def_id(),
-                pure_wrt_drop: param.pure_wrt_drop,
-                kind: ty::GenericParamDefKind::Lifetime,
-            }),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-
-    let early_lifetimes = super::early_bound_lifetimes_from_generics(tcx, hir_generics);
-    own_params.extend(early_lifetimes.enumerate().map(|(i, param)| ty::GenericParamDef {
-        name: param.name.ident().name,
-        index: own_start + i as u32,
-        def_id: param.def_id.to_def_id(),
-        pure_wrt_drop: param.pure_wrt_drop,
-        kind: ty::GenericParamDefKind::Lifetime,
-    }));
+    {
+        let lifetimes = hir_generics
+            .params
+            .iter()
+            .filter(|param| matches!(param.kind, GenericParamKind::Lifetime { .. }))
+            .enumerate()
+            .map(|(i, param)| {
+                // let GenericParamKind::Lifetime { kind } = param.kind else { unreachable!() };
+                ty::GenericParamDef {
+                    name: param.name.ident().name,
+                    index: own_start + i as u32,
+                    def_id: param.def_id.to_def_id(),
+                    pure_wrt_drop: param.pure_wrt_drop,
+                    kind: ty::GenericParamDefKind::Lifetime {
+                        bound: if !tcx.is_late_bound(param.hir_id) {
+                            ty::LifetimeParamBound::Early
+                        } else {
+                            ty::LifetimeParamBound::Late
+                        },
+                    },
+                }
+            });
+        own_params.extend(lifetimes);
+    }
 
     // Now create the real type and const parameters.
     let type_start = own_start - has_self as u32 + own_params.len() as u32;
@@ -392,12 +390,20 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
         let lifetimes = tcx.opaque_captured_lifetimes(def_id);
         debug!(?lifetimes);
 
-        own_params.extend(lifetimes.iter().map(|&(_, param)| ty::GenericParamDef {
+        own_params.extend(lifetimes.iter().map(|&(_arg, param)| ty::GenericParamDef {
             name: tcx.item_name(param.to_def_id()),
             index: next_index(),
             def_id: param.to_def_id(),
             pure_wrt_drop: false,
-            kind: ty::GenericParamDefKind::Lifetime,
+            #[expect(unreachable_code)]
+            kind: ty::GenericParamDefKind::Lifetime {
+                bound: todo!(),
+                // bound: if !tcx.is_late_bound(tcx.hir_node) {
+                //     ty::LifetimeParamBound::Early
+                // } else {
+                //     ty::LifetimeParamBound::Late
+                // },
+            },
         }))
     }
 
@@ -455,91 +461,91 @@ fn param_default_policy(node: Node<'_>) -> Option<ParamDefaultPolicy> {
     })
 }
 
-fn late_bound_regions<'tcx>(tcx: TyCtxt<'tcx>, node: Node<'tcx>) -> Vec<Span> {
-    struct LateBoundRegionsDetector<'tcx> {
-        tcx: TyCtxt<'tcx>,
-        outer_index: ty::DebruijnIndex,
-    }
+// fn late_bound_regions<'tcx>(tcx: TyCtxt<'tcx>, node: Node<'tcx>) -> Vec<Span> {
+//     struct LateBoundRegionsDetector<'tcx> {
+//         tcx: TyCtxt<'tcx>,
+//         outer_index: ty::DebruijnIndex,
+//     }
 
-    impl<'tcx> Visitor<'tcx> for LateBoundRegionsDetector<'tcx> {
-        type Result = ControlFlow<Span>;
-        fn visit_ty(&mut self, ty: &'tcx hir::Ty<'tcx, AmbigArg>) -> ControlFlow<Span> {
-            match ty.kind {
-                hir::TyKind::FnPtr(..) => {
-                    self.outer_index.shift_in(1);
-                    let res = intravisit::walk_ty(self, ty);
-                    self.outer_index.shift_out(1);
-                    res
-                }
-                hir::TyKind::UnsafeBinder(_) => {
-                    self.outer_index.shift_in(1);
-                    let res = intravisit::walk_ty(self, ty);
-                    self.outer_index.shift_out(1);
-                    res
-                }
-                _ => intravisit::walk_ty(self, ty),
-            }
-        }
+//     impl<'tcx> Visitor<'tcx> for LateBoundRegionsDetector<'tcx> {
+//         type Result = ControlFlow<Span>;
+//         fn visit_ty(&mut self, ty: &'tcx hir::Ty<'tcx, AmbigArg>) -> ControlFlow<Span> {
+//             match ty.kind {
+//                 hir::TyKind::FnPtr(..) => {
+//                     self.outer_index.shift_in(1);
+//                     let res = intravisit::walk_ty(self, ty);
+//                     self.outer_index.shift_out(1);
+//                     res
+//                 }
+//                 hir::TyKind::UnsafeBinder(_) => {
+//                     self.outer_index.shift_in(1);
+//                     let res = intravisit::walk_ty(self, ty);
+//                     self.outer_index.shift_out(1);
+//                     res
+//                 }
+//                 _ => intravisit::walk_ty(self, ty),
+//             }
+//         }
 
-        fn visit_poly_trait_ref(&mut self, tr: &'tcx hir::PolyTraitRef<'tcx>) -> ControlFlow<Span> {
-            self.outer_index.shift_in(1);
-            let res = intravisit::walk_poly_trait_ref(self, tr);
-            self.outer_index.shift_out(1);
-            res
-        }
+//         fn visit_poly_trait_ref(&mut self, tr: &'tcx hir::PolyTraitRef<'tcx>) -> ControlFlow<Span> {
+//             self.outer_index.shift_in(1);
+//             let res = intravisit::walk_poly_trait_ref(self, tr);
+//             self.outer_index.shift_out(1);
+//             res
+//         }
 
-        fn visit_lifetime(&mut self, lt: &'tcx hir::Lifetime) -> ControlFlow<Span> {
-            match self.tcx.named_bound_var(lt.hir_id) {
-                Some(rbv::ResolvedArg::StaticLifetime | rbv::ResolvedArg::EarlyBound(..)) => {
-                    ControlFlow::Continue(())
-                }
-                Some(rbv::ResolvedArg::LateBound(debruijn, _, _))
-                    if debruijn < self.outer_index =>
-                {
-                    ControlFlow::Continue(())
-                }
-                Some(
-                    rbv::ResolvedArg::LateBound(..)
-                    | rbv::ResolvedArg::Free(..)
-                    | rbv::ResolvedArg::Error(_),
-                )
-                | None => ControlFlow::Break(lt.ident.span),
-            }
-        }
-    }
+//         fn visit_lifetime(&mut self, lt: &'tcx hir::Lifetime) -> ControlFlow<Span> {
+//             match self.tcx.named_bound_var(lt.hir_id) {
+//                 Some(rbv::ResolvedArg::StaticLifetime | rbv::ResolvedArg::EarlyBound(..)) => {
+//                     ControlFlow::Continue(())
+//                 }
+//                 Some(rbv::ResolvedArg::LateBound(debruijn, _, _))
+//                     if debruijn < self.outer_index =>
+//                 {
+//                     ControlFlow::Continue(())
+//                 }
+//                 Some(
+//                     rbv::ResolvedArg::LateBound(..)
+//                     | rbv::ResolvedArg::Free(..)
+//                     | rbv::ResolvedArg::Error(_),
+//                 )
+//                 | None => ControlFlow::Break(lt.ident.span),
+//             }
+//         }
+//     }
 
-    fn late_bound_regions<'tcx>(
-        tcx: TyCtxt<'tcx>,
-        generics: &'tcx hir::Generics<'tcx>,
-        decl: &'tcx hir::FnDecl<'tcx>,
-    ) -> Vec<Span> {
-        let mut visitor = LateBoundRegionsDetector { tcx, outer_index: ty::INNERMOST };
+//     fn late_bound_regions<'tcx>(
+//         tcx: TyCtxt<'tcx>,
+//         generics: &'tcx hir::Generics<'tcx>,
+//         decl: &'tcx hir::FnDecl<'tcx>,
+//     ) -> Vec<Span> {
+//         let mut visitor = LateBoundRegionsDetector { tcx, outer_index: ty::INNERMOST };
 
-        let spans = generics
-            .params
-            .iter()
-            .flat_map(|param| {
-                if let GenericParamKind::Lifetime { .. } = param.kind
-                    && tcx.is_late_bound(param.hir_id)
-                {
-                    Some(param.span)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+//         let spans = generics
+//             .params
+//             .iter()
+//             .flat_map(|param| {
+//                 if let GenericParamKind::Lifetime { .. } = param.kind
+//                     && tcx.is_late_bound(param.hir_id)
+//                 {
+//                     Some(param.span)
+//                 } else {
+//                     None
+//                 }
+//             })
+//             .collect::<Vec<_>>();
 
-        if !spans.is_empty() {
-            spans
-        } else {
-            visitor.visit_fn_decl(decl).break_value().map_or_default(|val| vec![val])
-        }
-    }
+//         if !spans.is_empty() {
+//             spans
+//         } else {
+//             visitor.visit_fn_decl(decl).break_value().map_or_default(|val| vec![val])
+//         }
+//     }
 
-    let Some(decl) = node.fn_decl() else { return vec![] };
-    let Some(generics) = node.generics() else { return vec![] };
-    late_bound_regions(tcx, generics, decl)
-}
+//     let Some(decl) = node.fn_decl() else { return vec![] };
+//     let Some(generics) = node.generics() else { return vec![] };
+//     late_bound_regions(tcx, generics, decl)
+// }
 
 struct AnonConstInParamTyDetector {
     in_param_ty: bool,

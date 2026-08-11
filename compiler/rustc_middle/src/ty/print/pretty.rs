@@ -1335,7 +1335,7 @@ pub trait PrettyPrinter<'tcx>: Printer<'tcx> + fmt::Write {
             && generics
                 .own_params
                 .iter()
-                .all(|param| matches!(param.kind, ty::GenericParamDefKind::Lifetime))
+                .all(|param| matches!(param.kind, ty::GenericParamDefKind::Lifetime { .. }))
         {
             let num_args = generics.count();
             Some((fn_def_id, &args[..num_args]))
